@@ -21,6 +21,14 @@
     "status": "done",
     "details": "Created /api/stations endpoint, built React app with Stations table, integrated with backend using go:embed for static files. Template cleanup completed, project rebranded as OCPP Power Manager.",
     "artifacts": ["web/", "internal/httpapi/", "web/dist/"],
+    "next": 2.6
+  },
+  {
+    "step": 2.6,
+    "title": "Offline self-contained mode enabled",
+    "status": "done",
+    "details": "Made project fully self-contained for offline operation. Vendored all Go dependencies, pre-built React frontend, removed node_modules and lock files, updated .gitignore to include vendor/ and web/dist/, updated README.md with offline mode instructions.",
+    "artifacts": ["vendor/", "web/dist/", ".gitignore", "README.md", "go.mod"],
     "next": 3
   },
   {

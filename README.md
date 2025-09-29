@@ -15,12 +15,12 @@ Local and cloud-ready OCPP 1.6J management server. Tracks stations, sessions, en
 
 ### Prerequisites
 
-Install the required tools (see [PREREQUISITES.md](PREREQUISITES.md)):
-- Go 1.22+
-- Node.js 18+
-- Git
+This repository is **fully self-contained** and can run offline without external dependencies:
+- **Go 1.22+** (only requirement)
+- **No Node.js needed** - frontend is pre-built
+- **No internet required** - all dependencies are vendored
 
-### Local Development
+### Quick Start (Offline Mode)
 
 1. Clone the repository:
    ```bash
@@ -35,6 +35,12 @@ Install the required tools (see [PREREQUISITES.md](PREREQUISITES.md)):
 
 3. Open your browser to `http://localhost:8080`
 
+**That's it!** The application runs completely offline with:
+- ✅ **Vendored Go dependencies** in `/vendor` folder
+- ✅ **Pre-built React frontend** in `/web/dist` folder  
+- ✅ **Embedded static files** using `go:embed`
+- ✅ **Default SQLite database** (no Postgres required)
+
 ### Configuration
 
 The application uses environment variables for configuration:
@@ -44,6 +50,11 @@ HTTP_ADDR=":8080"                    # Server address
 DB_DRIVER="sqlite"                   # Database driver (sqlite/postgres)
 DB_DSN="file:ocpppm.db?_foreign_keys=on"  # Database connection string
 ```
+
+**Default Configuration:**
+- **Database**: SQLite (`ocpppm.db`) - no external database required
+- **Server**: Runs on `:8080` by default
+- **Frontend**: Pre-built and embedded in Go binary
 
 ## Project Structure
 
@@ -72,10 +83,11 @@ DB_DSN="file:ocpppm.db?_foreign_keys=on"  # Database connection string
 
 ### Backend Development
 ```bash
-go run ./cmd/OCPP-Power-Manager
+go run -mod=vendor ./cmd/OCPP-Power-Manager
 ```
 
-### Frontend Development
+### Frontend Development (Optional)
+If you need to modify the frontend:
 ```bash
 cd web
 npm install
@@ -86,6 +98,8 @@ npm run dev
 ```bash
 make build
 ```
+
+**Note**: The repository includes pre-built frontend assets. Frontend development is optional unless you need to modify the UI.
 
 ## License
 
