@@ -1,0 +1,98 @@
+[
+  {
+    "step": 1,
+    "title": "Repo scaffold",
+    "status": "done",
+    "details": "Go 1.22 module initialized. Base folders created: cmd/, internal/{config,db,ocpp,httpapi}, web/. Makefile added. Git remote set.",
+    "artifacts": ["go.mod", "Makefile", "cmd/", "internal/", "web/"],
+    "next": 2
+  },
+  {
+    "step": 2,
+    "title": "Config + DB bootstrap",
+    "status": "done",
+    "details": "Add config pkg (HTTP_ADDR, DB_DRIVER=sqlite|postgres, DB_DSN). Add DB open/close and goose helpers. Provide example env file.",
+    "artifacts": ["internal/config", "internal/db", ".env.example", "cmd/OCPP-Power-Manager/main.go", "Makefile"],
+    "next": 3
+  },
+  {
+    "step": 2.5,
+    "title": "Dashboard + Stations page using Mosaic Lite template",
+    "status": "done",
+    "details": "Downloaded Mosaic Lite template, created /api/stations endpoint, built React app with Stations table, integrated with backend using go:embed for static files.",
+    "artifacts": ["web/", "internal/httpapi/", "web/dist/"],
+    "next": 3
+  },
+  {
+    "step": 3,
+    "title": "Migrations",
+    "status": "todo",
+    "details": "Create goose migrations for tables: chargers, transactions, meter_values. Indices: mv_tx_ts(transaction_id, ts), tx_ch_ts(charger_id, start_ts).",
+    "artifacts": ["migrations/*.sql"],
+    "next": 4
+  },
+  {
+    "step": 4,
+    "title": "OCPP 1.6J handlers",
+    "status": "todo",
+    "details": "Implement WS server on /ocpp16 using ocpp-go. Handle BootNotification, StatusNotification, StartTransaction, MeterValues, StopTransaction. Persist rows. Compute energy_wh=stop-start.",
+    "artifacts": ["internal/ocpp/*"],
+    "next": 5
+  },
+  {
+    "step": 5,
+    "title": "HTTP API + CSV",
+    "status": "todo",
+    "details": "chi router. Endpoints: GET /api/chargers; GET /api/sessions?from&to&charger; GET /api/export/sessions.csv with energy_kwh.",
+    "artifacts": ["internal/httpapi/*"],
+    "next": 6
+  },
+  {
+    "step": 6,
+    "title": "Embedded web UI",
+    "status": "todo",
+    "details": "Vite+React minimal tables for Chargers and Sessions. Build to web/dist. Serve with go:embed.",
+    "artifacts": ["web/", "internal/httpapi/static.go"],
+    "next": 7
+  },
+  {
+    "step": 7,
+    "title": "Build + run",
+    "status": "todo",
+    "details": "Default to SQLite (file: ocpppm.db). Make targets: build, run, migrate-up, migrate-down. Verify start-to-stop session flow and CSV export.",
+    "artifacts": ["Makefile updates"],
+    "next": 8
+  },
+  {
+    "step": 8,
+    "title": "Postgres switch",
+    "status": "todo",
+    "details": "Enable DB_DRIVER=postgres with PGX DSN. Provide docker-compose for Postgres dev.",
+    "artifacts": ["docker-compose.yml", "docs/DB.md"],
+    "next": 9
+  },
+  {
+    "step": 9,
+    "title": "Forwarding (Phase 3)",
+    "status": "todo",
+    "details": "Add upstream WS client to parent CSMS. Mirror selected messages up/down. Per-charger toggle.",
+    "artifacts": ["internal/ocpp/forwarder.go"],
+    "next": 10
+  },
+  {
+    "step": 10,
+    "title": "MQTT bridge (Phase 4)",
+    "status": "todo",
+    "details": "Publish evse/{id}/meter; subscribe evse/{id}/cmd/* to OCPP commands. Mosquitto config for dev.",
+    "artifacts": ["internal/mqtt/*"],
+    "next": 11
+  },
+  {
+    "step": 11,
+    "title": "Load sharing + Local auth (Phase 5)",
+    "status": "todo",
+    "details": "Implement SendLocalList and SetChargingProfile allocator with site cap. Admin endpoints/UI.",
+    "artifacts": ["internal/ocpp/smart_charging.go", "internal/httpapi/admin.go"],
+    "next": null
+  }
+]
