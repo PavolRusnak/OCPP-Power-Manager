@@ -11,11 +11,13 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/pressly/goose/v3"
 	"go.uber.org/zap"
 
 	"OCPP-Power-Manager/internal/config"
 	"OCPP-Power-Manager/internal/db"
 	"OCPP-Power-Manager/internal/httpapi"
+	// "OCPP-Power-Manager/internal/ocpp"
 )
 
 func main() {
@@ -54,18 +56,41 @@ func main() {
 
 	logger.Info("Database connection established")
 
+	// Run migrations if requested
+	if os.Getenv("RUN_MIGRATIONS") == "1" {
+		logger.Info("Running database migrations")
+		if err := goose.SetDialect("sqlite3"); err != nil {
+			logger.Fatal("Failed to set goose dialect", zap.Error(err))
+		}
+		if err := goose.Up(database, "migrations"); err != nil {
+			logger.Fatal("Failed to run migrations", zap.Error(err))
+		}
+		logger.Info("Database migrations completed")
+	}
+
 	// Setup HTTP router
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
 
 	// Create API instance
-	api := httpapi.New(database)
+	api := httpapi.New(database, logger)
 
 	// API routes
 	r.Route("/api", func(r chi.Router) {
 		r.Mount("/", api.Routes())
 	})
+
+	// TODO: Start OCPP server (temporarily disabled due to API changes)
+	// ocppServer := ocpp.New(database, logger)
+	// ocppCtx, ocppCancel := context.WithCancel(ctx)
+	// defer ocppCancel()
+	// go func() {
+	// 	if err := ocppServer.Start(ocppCtx, ":8081"); err != nil {
+	// 		logger.Error("OCPP server failed", zap.Error(err))
+	// 	}
+	// }()
+	logger.Info("OCPP 1.6J server temporarily disabled")
 
 	// Serve static files (React app)
 	r.Handle("/*", httpapi.StaticHandler())

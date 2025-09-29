@@ -6,30 +6,18 @@ build:
 
 # Run the application (load .env if present)
 run:
-	@if [ -f .env ]; then \
-		set -a; \
-		. ./.env; \
-		set +a; \
-	fi; \
-	go run ./cmd/OCPP-Power-Manager
+	@if exist .env (set -a && . ./.env && set +a;) || true
+	go run -mod=vendor ./cmd/OCPP-Power-Manager
 
 # Run database migrations up
 migrate-up:
-	@if [ -f .env ]; then \
-		set -a; \
-		. ./.env; \
-		set +a; \
-	fi; \
-	goose -dir migrations $(DB_DRIVER) $(DB_DSN) up
+	@if exist .env (set -a && . ./.env && set +a;) || true
+	goose -dir migrations sqlite3 "file:ocpppm.db?_foreign_keys=on" up
 
 # Run database migrations down
 migrate-down:
-	@if [ -f .env ]; then \
-		set -a; \
-		. ./.env; \
-		set +a; \
-	fi; \
-	goose -dir migrations $(DB_DRIVER) $(DB_DSN) down
+	@if exist .env (set -a && . ./.env && set +a;) || true
+	goose -dir migrations sqlite3 "file:ocpppm.db?_foreign_keys=on" down
 
 # Clean build artifacts
 clean:

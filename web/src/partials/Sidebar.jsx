@@ -80,7 +80,7 @@ function Sidebar({
           </button>
           {/* Logo */}
           <NavLink end to="/" className="block">
-            <img src="/src/images/logo.svg" alt="OCPP Power Manager" width="32" height="32" />
+            <div className="text-lg font-bold text-violet-500">OCPP Power Manager</div>
           </NavLink>
         </div>
 
@@ -95,18 +95,47 @@ function Sidebar({
               <span className="lg:hidden lg:sidebar-expanded:block 2xl:block">OCPP Power Manager</span>
             </h3>
             <ul className="mt-3">
-              {/* Stations */}
-              <li className={`pl-4 pr-3 py-2 rounded-lg mb-0.5 last:mb-0 bg-linear-to-r ${pathname === "/" && "from-violet-500/[0.12] dark:from-violet-500/[0.24] to-violet-500/[0.04]"}`}>
+                {/* Stations */}
+                <li className={`pl-4 pr-3 py-2 rounded-lg mb-0.5 last:mb-0 bg-linear-to-r ${pathname === "/" && "from-violet-500/[0.12] dark:from-violet-500/[0.24] to-violet-500/[0.04]"}`}>
+                            <NavLink
+                              end
+                              to="/"
+                        className={`block text-gray-800 dark:text-gray-100 truncate transition duration-150 ${
+                      pathname === "/" ? "" : "hover:text-gray-900 dark:hover:text-white"
+                        }`}
+                      >
+                          <div className="flex items-center">
+                              <span className="text-sm font-medium lg:opacity-0 lg:sidebar-expanded:opacity-100 2xl:opacity-100 duration-200">
+                        Stations
+                            </span>
+                          </div>
+                            </NavLink>
+                          </li>
+                        </ul>
+                      </div>
+                          </div>
+
+        {/* OCPP Settings - Bottom Section */}
+        <div className="pt-6 border-t border-gray-200 dark:border-gray-700 mt-auto">
+          <div>
+            <h3 className="text-xs uppercase text-gray-400 dark:text-gray-500 font-semibold pl-3 mb-3">
+              <span className="hidden lg:block lg:sidebar-expanded:hidden 2xl:hidden text-center w-6" aria-hidden="true">
+                •••
+                              </span>
+              <span className="lg:hidden lg:sidebar-expanded:block 2xl:block">Configuration</span>
+            </h3>
+            <ul>
+              <li className={`pl-4 pr-3 py-2 rounded-lg mb-0.5 last:mb-0 bg-linear-to-r ${pathname === "/ocpp-settings" && "from-violet-500/[0.12] dark:from-violet-500/[0.24] to-violet-500/[0.04]"}`}>
                 <NavLink
                   end
-                  to="/"
+                  to="/ocpp-settings"
                   className={`block text-gray-800 dark:text-gray-100 truncate transition duration-150 ${
-                    pathname === "/" ? "" : "hover:text-gray-900 dark:hover:text-white"
+                    pathname === "/ocpp-settings" ? "" : "hover:text-gray-900 dark:hover:text-white"
                   }`}
                 >
                   <div className="flex items-center">
                     <span className="text-sm font-medium lg:opacity-0 lg:sidebar-expanded:opacity-100 2xl:opacity-100 duration-200">
-                      Stations
+                      OCPP Settings
                     </span>
                   </div>
                 </NavLink>

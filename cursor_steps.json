@@ -33,6 +33,14 @@
   },
   {
     "step": 3,
+    "title": "Phase 1 Stations & Total Energy (CRUD, kWh tracking)",
+    "status": "done",
+    "details": "Implemented Phase 1 OCPP Power Manager with stations CRUD operations and total energy tracking. Features include: database migrations with total_energy_wh column, HTTP API endpoints for stations management, React frontend with Stations page (no Sessions), fixed cursor jumping in forms, removed star icons, and self-contained operation. Ready for OCPP 1.6J integration.",
+    "artifacts": ["migrations/", "internal/httpapi/", "web/src/pages/", "go.mod", "Makefile"],
+    "next": 4
+  },
+  {
+    "step": 3,
     "title": "Migrations",
     "status": "todo",
     "details": "Create goose migrations for tables: chargers, transactions, meter_values. Indices: mv_tx_ts(transaction_id, ts), tx_ch_ts(charger_id, start_ts).",
