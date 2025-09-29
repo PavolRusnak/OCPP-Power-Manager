@@ -17,9 +17,9 @@
   },
   {
     "step": 2.5,
-    "title": "Dashboard + Stations page using Mosaic Lite template",
+    "title": "Dashboard + Stations page (Template cleanup completed)",
     "status": "done",
-    "details": "Downloaded Mosaic Lite template, created /api/stations endpoint, built React app with Stations table, integrated with backend using go:embed for static files.",
+    "details": "Created /api/stations endpoint, built React app with Stations table, integrated with backend using go:embed for static files. Template cleanup completed, project rebranded as OCPP Power Manager.",
     "artifacts": ["web/", "internal/httpapi/", "web/dist/"],
     "next": 3
   },

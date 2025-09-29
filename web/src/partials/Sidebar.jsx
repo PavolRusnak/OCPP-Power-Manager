@@ -80,7 +80,7 @@ function Sidebar({
           </button>
           {/* Logo */}
           <NavLink end to="/" className="block">
-            <div className="text-lg font-bold text-violet-500">EnerPro</div>
+            <img src="/src/images/logo.svg" alt="OCPP Power Manager" width="32" height="32" />
           </NavLink>
         </div>
 

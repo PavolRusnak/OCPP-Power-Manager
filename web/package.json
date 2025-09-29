@@ -1,6 +1,8 @@
 {
-  "name": "enerpro-ocpp-manager",
+  "name": "ocpp-power-manager",
   "version": "0.1.0",
+  "description": "OCPP 1.6J management dashboard",
+  "author": "Pavol Rusnak",
   "type": "module",
   "scripts": {
     "dev": "vite",
