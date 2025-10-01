@@ -11,6 +11,7 @@ function Stations() {
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingStation, setEditingStation] = useState(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [lastUpdate, setLastUpdate] = useState(new Date());
   
   // Use refs for form inputs to avoid re-renders completely
   const identityRef = useRef(null);
@@ -38,6 +39,14 @@ function Stations() {
 
   useEffect(() => {
     fetchStations();
+    
+    // Set up real-time polling every 5 seconds
+    const interval = setInterval(() => {
+      fetchStations();
+      setLastUpdate(new Date());
+    }, 5000);
+    
+    return () => clearInterval(interval);
   }, [fetchStations]);
 
   const createStation = async (e) => {
@@ -169,6 +178,17 @@ function Stations() {
     return date.toLocaleDateString();
   };
 
+  const isStationOnline = (timestamp) => {
+    if (!timestamp) return false;
+    const date = new Date(timestamp);
+    const now = new Date();
+    const diffMs = now - date;
+    const diffMins = Math.floor(diffMs / 60000);
+    
+    // Consider station online if last seen within 10 minutes
+    return diffMins <= 10;
+  };
+
   const formatTotalEnergy = (kwh) => {
     if (kwh === null || kwh === undefined) return '0.000 kWh';
     return `${kwh.toFixed(3)} kWh`;
@@ -196,6 +216,11 @@ function Stations() {
 
         {/* Right: Actions */}
         <div className="grid grid-flow-col sm:auto-cols-max justify-start sm:justify-end gap-2">
+          {/* Live update indicator */}
+          <div className="flex items-center text-sm text-gray-500 dark:text-gray-400">
+            <div className="w-2 h-2 bg-green-500 rounded-full mr-2 animate-pulse"></div>
+            <span>Live • Updated {formatLastSeen(lastUpdate)}</span>
+          </div>
           {/* Search form */}
           <div className="relative">
             <input
@@ -248,6 +273,9 @@ function Stations() {
                   <div className="font-semibold text-left">Total Energy (kWh)</div>
                 </th>
                 <th className="px-2 py-3 whitespace-nowrap">
+                  <div className="font-semibold text-left">Status</div>
+                </th>
+                <th className="px-2 py-3 whitespace-nowrap">
                   <div className="font-semibold text-left">Last Heartbeat</div>
                 </th>
                 <th className="px-2 py-3 whitespace-nowrap">
@@ -259,15 +287,15 @@ function Stations() {
             <tbody className="text-sm divide-y divide-gray-200 dark:divide-gray-700">
               {loading ? (
                 <tr>
-                  <td colSpan="8" className="px-2 py-3 whitespace-nowrap text-center">Loading stations...</td>
+                  <td colSpan="9" className="px-2 py-3 whitespace-nowrap text-center">Loading stations...</td>
                 </tr>
               ) : error ? (
                 <tr>
-                  <td colSpan="8" className="px-2 py-3 whitespace-nowrap text-center text-red-500">Error: {error.message}</td>
+                  <td colSpan="9" className="px-2 py-3 whitespace-nowrap text-center text-red-500">Error: {error.message}</td>
                 </tr>
               ) : filteredStations.length === 0 ? (
                 <tr>
-                  <td colSpan="8" className="px-2 py-3 whitespace-nowrap text-center">No stations found.</td>
+                  <td colSpan="9" className="px-2 py-3 whitespace-nowrap text-center">No stations found.</td>
                 </tr>
               ) : (
                 filteredStations.map(station => (
@@ -291,7 +319,29 @@ function Stations() {
                       <div className="text-left">{formatTotalEnergy(station.total_energy_kwh)}</div>
                     </td>
                     <td className="px-2 py-3 whitespace-nowrap">
-                      <div className="text-left">{formatLastSeen(station.last_seen)}</div>
+                      <div className="text-left flex items-center">
+                        {isStationOnline(station.last_seen) ? (
+                          <div className="flex items-center">
+                            <div className="w-2 h-2 bg-green-500 rounded-full mr-2 animate-pulse"></div>
+                            <span className="text-green-600 dark:text-green-400 font-medium">Online</span>
+                          </div>
+                        ) : (
+                          <div className="flex items-center">
+                            <div className="w-2 h-2 bg-red-500 rounded-full mr-2"></div>
+                            <span className="text-red-600 dark:text-red-400 font-medium">Offline</span>
+                          </div>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-2 py-3 whitespace-nowrap">
+                      <div className="text-left">
+                        <div className="font-mono text-sm">{formatLastSeen(station.last_seen)}</div>
+                        {station.last_seen && (
+                          <div className="text-xs text-gray-500 dark:text-gray-400">
+                            {new Date(station.last_seen).toLocaleTimeString()}
+                          </div>
+                        )}
+                      </div>
                     </td>
                     <td className="px-2 py-3 whitespace-nowrap">
                       <div className="text-left flex items-center">
