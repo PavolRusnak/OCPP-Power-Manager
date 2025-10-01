@@ -112,7 +112,7 @@ func main() {
 	logger.Info("📱 Web interface ready - Manage your EV charging stations")
 	logger.Info("🔌 OCPP server ready - Stations can connect to ws://localhost:8080/ocpp16/{station_id}")
 	logger.Info("⏹️ Press Ctrl+C to stop the server")
-	
+
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
