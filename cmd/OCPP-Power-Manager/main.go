@@ -17,7 +17,7 @@ import (
 	"OCPP-Power-Manager/internal/config"
 	"OCPP-Power-Manager/internal/db"
 	"OCPP-Power-Manager/internal/httpapi"
-	// "OCPP-Power-Manager/internal/ocpp"
+	"OCPP-Power-Manager/internal/ocpp"
 )
 
 func main() {
@@ -73,24 +73,17 @@ func main() {
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
 
-	// Create API instance
-	api := httpapi.New(database, logger)
+	// Mount OCPP server
+	ocppServer := ocpp.New(database, logger)
+	ocppServer.Mount(r)
+
+	// Create API instance with OCPP server
+	api := httpapi.New(database, logger, ocppServer)
 
 	// API routes
 	r.Route("/api", func(r chi.Router) {
 		r.Mount("/", api.Routes())
 	})
-
-	// TODO: Start OCPP server (temporarily disabled due to API changes)
-	// ocppServer := ocpp.New(database, logger)
-	// ocppCtx, ocppCancel := context.WithCancel(ctx)
-	// defer ocppCancel()
-	// go func() {
-	// 	if err := ocppServer.Start(ocppCtx, ":8081"); err != nil {
-	// 		logger.Error("OCPP server failed", zap.Error(err))
-	// 	}
-	// }()
-	logger.Info("OCPP 1.6J server temporarily disabled")
 
 	// Serve static files (React app)
 	r.Handle("/*", httpapi.StaticHandler())

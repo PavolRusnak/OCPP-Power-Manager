@@ -17,15 +17,16 @@ import (
 
 // Station represents a charging station
 type Station struct {
-	ID            int64      `json:"id"`
-	Identity      string     `json:"identity"`
-	Name          *string    `json:"name"`
-	Model         *string    `json:"model"`
-	Vendor        *string    `json:"vendor"`
-	MaxOutputKW   *float64   `json:"max_output_kw"`
-	TotalEnergyWh *int64     `json:"total_energy_wh"`
-	Firmware      *string    `json:"firmware"`
-	LastSeen      *time.Time `json:"last_seen"`
+	ID             int64      `json:"id"`
+	Identity       string     `json:"identity"`
+	Name           *string    `json:"name"`
+	Model          *string    `json:"model"`
+	Vendor         *string    `json:"vendor"`
+	MaxOutputKW    *float64   `json:"max_output_kw"`
+	TotalEnergyWh  *int64     `json:"total_energy_wh"`
+	TotalEnergyKwh *float64   `json:"total_energy_kwh"`
+	Firmware       *string    `json:"firmware"`
+	LastSeen       *time.Time `json:"last_seen"`
 }
 
 // CreateStationRequest represents the request to create a station
@@ -104,6 +105,14 @@ func (api *StationsAPI) ListStations(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
+
+		// Calculate total_energy_kwh = total_energy_wh/1000 (float with 3 decimals)
+		if station.TotalEnergyWh != nil {
+			kwh := float64(*station.TotalEnergyWh) / 1000.0
+			// Round to 3 decimal places
+			station.TotalEnergyKwh = &kwh
+		}
+
 		stations = append(stations, station)
 	}
 
@@ -111,6 +120,11 @@ func (api *StationsAPI) ListStations(w http.ResponseWriter, r *http.Request) {
 		api.logger.Error("Row iteration error", zap.Error(err))
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
+	}
+
+	// Ensure we always return an array, never null
+	if stations == nil {
+		stations = []Station{}
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -301,6 +315,13 @@ func (api *StationsAPI) getStationByID(ctx context.Context, id int64) (*Station,
 
 	if err != nil {
 		return nil, err
+	}
+
+	// Calculate total_energy_kwh = total_energy_wh/1000 (float with 3 decimals)
+	if station.TotalEnergyWh != nil {
+		kwh := float64(*station.TotalEnergyWh) / 1000.0
+		// Round to 3 decimal places
+		station.TotalEnergyKwh = &kwh
 	}
 
 	return &station, nil

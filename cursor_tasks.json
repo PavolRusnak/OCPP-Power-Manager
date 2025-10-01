@@ -1,0 +1,81 @@
+[
+  {
+    "id": 1,
+    "title": "Enable OCPP 1.6J server",
+    "details": "Wire ocpp-go server at /ocpp16. BootNotification -> upsert charger (identity, firmware, last_seen). StatusNotification -> update last_seen.",
+    "changes": ["internal/ocpp/server.go", "cmd/OCPP-Power-Manager/main.go"],
+    "acceptance": [
+      "✅ App starts without error",
+      "✅ Log shows OCPP listener bound",
+      "✅ Hitting / (UI) still works",
+      "✅ OCPP endpoint available at /ocpp16"
+    ],
+    "status": "completed"
+  },
+  {
+    "id": 2,
+    "title": "MeterValues -> total_energy_wh",
+    "details": "Handle measurand Energy.Active.Import.Register (Wh or kWh). Normalize to Wh. Update chargers.total_energy_wh using monotonic cumulative register logic: if new_value_wh >= current_total -> set total = new_value_wh; else ignore.",
+    "changes": ["internal/ocpp/server.go", "internal/db/db.go"],
+    "acceptance": [
+      "✅ Posting a fake MeterValues handler invocation updates chargers.total_energy_wh",
+      "✅ No negative or decreasing totals recorded"
+    ],
+    "status": "completed"
+  },
+  {
+    "id": 3,
+    "title": "Stations API: expose total_energy_kwh",
+    "details": "GET /api/stations must return total_energy_kwh = total_energy_wh/1000 (float with 3 decimals).",
+    "changes": ["internal/httpapi/stations.go"],
+    "acceptance": [
+      "✅ UI table shows Total Energy (kWh)",
+      "✅ JSON contains total_energy_kwh"
+    ],
+    "status": "completed"
+  },
+  {
+    "id": 4,
+    "title": "UI: show energy and last_seen",
+    "details": "On Stations page, render Total Energy (kWh, 3 dp) and Last Seen (relative time).",
+    "changes": ["web/src/pages/Stations.jsx"],
+    "acceptance": [
+      "✅ Columns visible: Total Energy (kWh), Last Seen",
+      "✅ Formatting correct"
+    ],
+    "status": "completed"
+  },
+  {
+    "id": 5,
+    "title": "Dev test hook for MeterValues",
+    "details": "Add POST /api/dev/meter to simulate a MeterValues update: body {identity, ts, value_wh}. Find charger by identity, insert into meter_values, update total_energy_wh via same logic as OCPP handler.",
+    "changes": ["internal/httpapi/api.go", "internal/httpapi/dev.go"],
+    "acceptance": [
+      "✅ POST /api/dev/meter returns 200",
+      "✅ Subsequent GET /api/stations shows increased total_energy_kwh"
+    ],
+    "status": "completed"
+  },
+  {
+    "id": 6,
+    "title": "Settings: backend binding",
+    "details": "Create GET/PUT /api/settings to read/write runtime config (HTTP_ADDR excluded). Persist minimal fields in a new table app_settings(key TEXT PRIMARY KEY, value TEXT). UI Settings page must fetch and save Heartbeat Interval and Log Level (store as strings).",
+    "changes": ["migrations/*.sql", "internal/httpapi/api.go", "internal/httpapi/settings.go", "web/src/pages/OCPPSettings.jsx"],
+    "acceptance": [
+      "✅ PUT /api/settings persists values",
+      "✅ Reload keeps settings"
+    ],
+    "status": "completed"
+  },
+  {
+    "id": 7,
+    "title": "Offline build hygiene",
+    "details": "Ensure go mod vendor is up-to-date; embed web/dist; remove any stray external fetches. Update README run steps.",
+    "changes": ["go.mod", "vendor/", "internal/httpapi/static.go", "README.md"],
+    "acceptance": [
+      "✅ go run -mod=vendor ./cmd/OCPP-Power-Manager works offline",
+      "✅ UI served at /"
+    ],
+    "status": "completed"
+  }
+]

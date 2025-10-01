@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
 import Sidebar from '../partials/Sidebar';
 import Header from '../partials/Header';
@@ -6,29 +6,117 @@ import Banner from '../partials/Banner';
 
 function OCPPSettings() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState(null);
+  const [serverStatus, setServerStatus] = useState({
+    ocppServerRunning: false,
+    httpAddr: ':8080',
+    ocppEndpoint: '/ocpp16'
+  });
+  const [serverActionLoading, setServerActionLoading] = useState(false);
   const [settings, setSettings] = useState({
-    serverPort: '8081',
-    heartbeatInterval: '300',
-    connectionTimeout: '30',
-    maxConnections: '100',
-    enableLogging: true,
-    logLevel: 'info'
+    heartbeatInterval: '300'
   });
 
+  // Fetch settings and server status on component mount
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        
+        // Fetch settings
+        const settingsResponse = await fetch('/api/settings');
+        if (!settingsResponse.ok) {
+          throw new Error(`HTTP error! status: ${settingsResponse.status}`);
+        }
+        const settingsData = await settingsResponse.json();
+        setSettings(settingsData);
+
+        // Fetch server status
+        const statusResponse = await fetch('/api/settings/status');
+        if (!statusResponse.ok) {
+          throw new Error(`HTTP error! status: ${statusResponse.status}`);
+        }
+        const statusData = await statusResponse.json();
+        setServerStatus(statusData);
+      } catch (error) {
+        setError(error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, []);
+
+  const handleServerAction = async (action) => {
+    try {
+      setServerActionLoading(true);
+      setError(null);
+      
+      const response = await fetch(`/api/settings/server/${action}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+      }
+
+      const result = await response.json();
+      alert(result.message);
+      
+      // Refresh server status
+      const statusResponse = await fetch('/api/settings/status');
+      if (statusResponse.ok) {
+        const statusData = await statusResponse.json();
+        setServerStatus(statusData);
+      }
+    } catch (error) {
+      setError(error);
+    } finally {
+      setServerActionLoading(false);
+    }
+  };
+
   const handleInputChange = (e) => {
-    const { name, value, type, checked } = e.target;
+    const { name, value } = e.target;
     setSettings(prev => ({
       ...prev,
-      [name]: type === 'checkbox' ? checked : value
+      [name]: value
     }));
   };
 
-  const handleSave = (e) => {
+  const handleSave = async (e) => {
     e.preventDefault();
-    // TODO: Implement save to backend
-    console.log('Saving OCPP settings:', settings);
-    // For now, just show a success message
-    alert('Settings saved successfully!');
+    try {
+      setSaving(true);
+      setError(null);
+      
+      const response = await fetch('/api/settings', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(settings),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+      }
+
+      alert('Settings saved successfully!');
+    } catch (error) {
+      setError(error);
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleTestConnection = () => {
@@ -55,32 +143,37 @@ function OCPPSettings() {
         <p className="text-gray-600 dark:text-gray-400 mt-2">Configure OCPP 1.6J server connection settings</p>
       </div>
 
+      {/* Error Message */}
+      {error && (
+        <div className="mb-6 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
+          <div className="flex">
+            <div className="flex-shrink-0">
+              <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+              </svg>
+            </div>
+            <div className="ml-3">
+              <h3 className="text-sm font-medium text-red-800 dark:text-red-200">Error</h3>
+              <div className="mt-2 text-sm text-red-700 dark:text-red-300">
+                {error.message}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Settings Form */}
       <div className="bg-white dark:bg-gray-800 shadow-lg rounded-lg border border-gray-200 dark:border-gray-700 p-6">
-        <form onSubmit={handleSave}>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Server Configuration */}
-            <div className="space-y-4">
-              <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4">Server Configuration</h3>
+        {loading ? (
+          <div className="text-center py-8">
+            <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-violet-500"></div>
+            <p className="mt-2 text-gray-600 dark:text-gray-400">Loading settings...</p>
+          </div>
+        ) : (
+          <form onSubmit={handleSave}>
+            <div className="space-y-6">
+              <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4">OCPP Configuration</h3>
               
-              <div>
-                <label className="block text-gray-700 dark:text-gray-300 text-sm font-bold mb-2" htmlFor="serverPort">
-                  Server Port
-                </label>
-                <input
-                  type="number"
-                  id="serverPort"
-                  name="serverPort"
-                  value={settings.serverPort}
-                  onChange={handleInputChange}
-                  className="form-input w-full"
-                  placeholder="8081"
-                  min="1024"
-                  max="65535"
-                />
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Port for OCPP WebSocket connections</p>
-              </div>
-
               <div>
                 <label className="block text-gray-700 dark:text-gray-300 text-sm font-bold mb-2" htmlFor="heartbeatInterval">
                   Heartbeat Interval (seconds)
@@ -95,85 +188,12 @@ function OCPPSettings() {
                   placeholder="300"
                   min="30"
                   max="3600"
+                  required
                 />
                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">How often stations send heartbeat messages</p>
               </div>
 
-              <div>
-                <label className="block text-gray-700 dark:text-gray-300 text-sm font-bold mb-2" htmlFor="connectionTimeout">
-                  Connection Timeout (seconds)
-                </label>
-                <input
-                  type="number"
-                  id="connectionTimeout"
-                  name="connectionTimeout"
-                  value={settings.connectionTimeout}
-                  onChange={handleInputChange}
-                  className="form-input w-full"
-                  placeholder="30"
-                  min="5"
-                  max="300"
-                />
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Timeout for establishing connections</p>
-              </div>
             </div>
-
-            {/* Advanced Settings */}
-            <div className="space-y-4">
-              <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4">Advanced Settings</h3>
-              
-              <div>
-                <label className="block text-gray-700 dark:text-gray-300 text-sm font-bold mb-2" htmlFor="maxConnections">
-                  Max Connections
-                </label>
-                <input
-                  type="number"
-                  id="maxConnections"
-                  name="maxConnections"
-                  value={settings.maxConnections}
-                  onChange={handleInputChange}
-                  className="form-input w-full"
-                  placeholder="100"
-                  min="1"
-                  max="1000"
-                />
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Maximum concurrent station connections</p>
-              </div>
-
-              <div>
-                <label className="block text-gray-700 dark:text-gray-300 text-sm font-bold mb-2" htmlFor="logLevel">
-                  Log Level
-                </label>
-                <select
-                  id="logLevel"
-                  name="logLevel"
-                  value={settings.logLevel}
-                  onChange={handleInputChange}
-                  className="form-select w-full"
-                >
-                  <option value="debug">Debug</option>
-                  <option value="info">Info</option>
-                  <option value="warn">Warning</option>
-                  <option value="error">Error</option>
-                </select>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Level of detail in OCPP logs</p>
-              </div>
-
-              <div className="flex items-center">
-                <input
-                  type="checkbox"
-                  id="enableLogging"
-                  name="enableLogging"
-                  checked={settings.enableLogging}
-                  onChange={handleInputChange}
-                  className="form-checkbox"
-                />
-                <label htmlFor="enableLogging" className="ml-2 text-gray-700 dark:text-gray-300 text-sm">
-                  Enable OCPP Logging
-                </label>
-              </div>
-            </div>
-          </div>
 
           {/* Action Buttons */}
           <div className="flex justify-end space-x-3 mt-8 pt-6 border-t border-gray-200 dark:border-gray-700">
@@ -186,24 +206,66 @@ function OCPPSettings() {
             </button>
             <button
               type="submit"
-              className="btn bg-violet-500 hover:bg-violet-600 text-white"
+              disabled={saving}
+              className="btn bg-violet-500 hover:bg-violet-600 text-white disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Save Settings
+              {saving ? 'Saving...' : 'Save Settings'}
             </button>
           </div>
         </form>
+        )}
       </div>
 
       {/* Connection Status */}
       <div className="mt-6 bg-white dark:bg-gray-800 shadow-lg rounded-lg border border-gray-200 dark:border-gray-700 p-6">
         <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4">Connection Status</h3>
         <div className="flex items-center space-x-3">
-          <div className="w-3 h-3 bg-red-500 rounded-full"></div>
-          <span className="text-gray-700 dark:text-gray-300">OCPP Server: Disabled</span>
+          <div className={`w-3 h-3 rounded-full ${serverStatus.ocppServerRunning ? 'bg-green-500' : 'bg-red-500'}`}></div>
+          <span className="text-gray-700 dark:text-gray-300">
+            OCPP Server: {serverStatus.ocppServerRunning ? 'Running' : 'Stopped'}
+          </span>
         </div>
-        <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">
-          The OCPP 1.6J server is currently disabled. Enable it in the settings above to start accepting station connections.
+        <div className="mt-2 space-y-1">
+          <p className="text-sm text-gray-500 dark:text-gray-400">
+            <strong>HTTP Server:</strong> {serverStatus.httpAddr}
+          </p>
+          <p className="text-sm text-gray-500 dark:text-gray-400">
+            <strong>OCPP Endpoint:</strong> {serverStatus.ocppEndpoint}
+          </p>
+        </div>
+        <p className="text-sm text-gray-500 dark:text-gray-400 mt-3">
+          {serverStatus.ocppServerRunning 
+            ? 'The OCPP 1.6J server is running and ready to accept station connections.'
+            : 'The OCPP 1.6J server is currently stopped. Restart the application to enable it.'
+          }
         </p>
+        
+        {/* Server Control Buttons */}
+        <div className="mt-4 flex space-x-3">
+          <button
+            onClick={() => handleServerAction('start')}
+            disabled={serverActionLoading || serverStatus.ocppServerRunning}
+            className={`px-4 py-2 rounded-md text-sm font-medium ${
+              serverActionLoading || serverStatus.ocppServerRunning
+                ? 'bg-gray-300 dark:bg-gray-600 text-gray-500 dark:text-gray-400 cursor-not-allowed'
+                : 'bg-green-600 hover:bg-green-700 text-white'
+            }`}
+          >
+            {serverActionLoading ? 'Processing...' : 'Start Server'}
+          </button>
+          
+          <button
+            onClick={() => handleServerAction('stop')}
+            disabled={serverActionLoading || !serverStatus.ocppServerRunning}
+            className={`px-4 py-2 rounded-md text-sm font-medium ${
+              serverActionLoading || !serverStatus.ocppServerRunning
+                ? 'bg-gray-300 dark:bg-gray-600 text-gray-500 dark:text-gray-400 cursor-not-allowed'
+                : 'bg-red-600 hover:bg-red-700 text-white'
+            }`}
+          >
+            {serverActionLoading ? 'Processing...' : 'Stop Server'}
+          </button>
+        </div>
       </div>
           </div>
         </main>

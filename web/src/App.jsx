@@ -12,6 +12,7 @@ import './charts/ChartjsConfig';
 // Import pages
 import Dashboard from './pages/Dashboard';
 import OCPPSettings from './pages/OCPPSettings';
+import Stations from './pages/Stations';
 
 function App() {
 
@@ -27,6 +28,7 @@ function App() {
     <>
       <Routes>
         <Route exact path="/" element={<Dashboard />} />
+        <Route exact path="/stations" element={<Stations />} />
         <Route exact path="/ocpp-settings" element={<OCPPSettings />} />
       </Routes>
     </>

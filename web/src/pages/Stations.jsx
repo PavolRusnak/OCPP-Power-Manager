@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import Sidebar from '../partials/Sidebar';
+import Header from '../partials/Header';
 
 function Stations() {
   const [stations, setStations] = useState([]);
@@ -8,6 +10,7 @@ function Stations() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingStation, setEditingStation] = useState(null);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   
   // Use refs for form inputs to avoid re-renders completely
   const identityRef = useRef(null);
@@ -152,16 +155,38 @@ function Stations() {
 
   const formatLastSeen = (timestamp) => {
     if (!timestamp) return 'Never';
-    return new Date(timestamp).toLocaleString();
+    const date = new Date(timestamp);
+    const now = new Date();
+    const diffMs = now - date;
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMins / 60);
+    const diffDays = Math.floor(diffHours / 24);
+    
+    if (diffMins < 1) return 'Just now';
+    if (diffMins < 60) return `${diffMins}m ago`;
+    if (diffHours < 24) return `${diffHours}h ago`;
+    if (diffDays < 7) return `${diffDays}d ago`;
+    return date.toLocaleDateString();
   };
 
-  const formatTotalEnergy = (wh) => {
-    if (wh === null || wh === undefined) return '0 kWh';
-    return `${(wh / 1000).toFixed(2)} kWh`;
+  const formatTotalEnergy = (kwh) => {
+    if (kwh === null || kwh === undefined) return '0.000 kWh';
+    return `${kwh.toFixed(3)} kWh`;
   };
 
   return (
-    <div className="px-4 sm:px-6 lg:px-8 py-8 w-full max-w-9xl mx-auto">
+    <div className="flex h-screen overflow-hidden">
+      {/* Sidebar */}
+      <Sidebar sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
+      
+      {/* Content area */}
+      <div className="relative flex flex-col flex-1 overflow-y-auto overflow-x-hidden">
+        {/* Header */}
+        <Header sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
+        
+        {/* Main content */}
+        <main className="flex-1">
+          <div className="px-4 sm:px-6 lg:px-8 py-8 w-full max-w-9xl mx-auto">
       {/* Page header */}
       <div className="sm:flex sm:justify-between sm:items-center mb-8">
         {/* Left: Title */}
@@ -263,7 +288,7 @@ function Stations() {
                       <div className="text-left">{station.max_output_kw !== null ? `${station.max_output_kw} kW` : '-'}</div>
                     </td>
                     <td className="px-2 py-3 whitespace-nowrap">
-                      <div className="text-left">{formatTotalEnergy(station.total_energy_wh)}</div>
+                      <div className="text-left">{formatTotalEnergy(station.total_energy_kwh)}</div>
                     </td>
                     <td className="px-2 py-3 whitespace-nowrap">
                       <div className="text-left">{formatLastSeen(station.last_seen)}</div>
@@ -469,6 +494,9 @@ function Stations() {
           </div>
         </div>
       )}
+          </div>
+        </main>
+      </div>
     </div>
   );
 }

@@ -1,35 +1,9 @@
-import React, { useState } from 'react';
-
-import Sidebar from '../partials/Sidebar';
-import Header from '../partials/Header';
-import Banner from '../partials/Banner';
-import Stations from './Stations';
+import React from 'react';
+import { Navigate } from 'react-router-dom';
 
 function Dashboard() {
-
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-
-  return (
-    <div className="flex h-screen overflow-hidden">
-
-      {/* Sidebar */}
-      <Sidebar sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
-
-      {/* Content area */}
-      <div className="relative flex flex-col flex-1 overflow-y-auto overflow-x-hidden">
-
-        {/*  Site header */}
-        <Header sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
-
-        <main className="grow">
-          <Stations />
-        </main>
-
-        <Banner />
-
-      </div>
-    </div>
-  );
+  // Redirect to stations page since that's what we want to show on the dashboard
+  return <Navigate to="/stations" replace />;
 }
 
 export default Dashboard;

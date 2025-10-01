@@ -28,9 +28,13 @@ This repository is **fully self-contained** and can run offline without external
    cd OCPP-Power-Manager
    ```
 
-2. Run the application:
+2. Run the application (offline mode):
    ```bash
-   make run
+   # Run with migrations (first time only)
+   RUN_MIGRATIONS=1 go run -mod=vendor ./cmd/OCPP-Power-Manager
+   
+   # Or run normally (after first setup)
+   go run -mod=vendor ./cmd/OCPP-Power-Manager
    ```
 
 3. Open your browser to `http://localhost:8080`
