@@ -12,6 +12,7 @@ function Stations() {
   const [editingStation, setEditingStation] = useState(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [lastUpdate, setLastUpdate] = useState(new Date());
+  const [serverStatus, setServerStatus] = useState({ ocppServerRunning: false });
   
   // Use refs for form inputs to avoid re-renders completely
   const identityRef = useRef(null);
@@ -37,17 +38,32 @@ function Stations() {
     }
   }, []);
 
+  const fetchServerStatus = useCallback(async () => {
+    try {
+      const response = await fetch('/api/settings/status');
+      if (response.ok) {
+        const data = await response.json();
+        setServerStatus(data);
+      }
+    } catch (error) {
+      // Silently fail - server might be down
+      setServerStatus({ ocppServerRunning: false });
+    }
+  }, []);
+
   useEffect(() => {
     fetchStations();
+    fetchServerStatus();
     
     // Set up real-time polling every 5 seconds
     const interval = setInterval(() => {
       fetchStations();
+      fetchServerStatus();
       setLastUpdate(new Date());
     }, 5000);
     
     return () => clearInterval(interval);
-  }, [fetchStations]);
+  }, [fetchStations, fetchServerStatus]);
 
   const createStation = async (e) => {
     e.preventDefault();
@@ -214,8 +230,17 @@ function Stations() {
           <h1 className="text-2xl md:text-3xl text-gray-800 dark:text-gray-100 font-bold">Stations</h1>
           {/* Live update indicator */}
           <div className="flex items-center text-sm text-gray-500 dark:text-gray-400">
-            <div className="w-2 h-2 bg-green-500 rounded-full mr-2 animate-pulse"></div>
-            <span>Live • Updated {formatLastSeen(lastUpdate)}</span>
+            {serverStatus.ocppServerRunning ? (
+              <>
+                <div className="w-2 h-2 bg-green-500 rounded-full mr-2 animate-pulse"></div>
+                <span>Live • Updated {formatLastSeen(lastUpdate)}</span>
+              </>
+            ) : (
+              <>
+                <div className="w-2 h-2 bg-red-500 rounded-full mr-2"></div>
+                <span>Server Stopped • Updated {formatLastSeen(lastUpdate)}</span>
+              </>
+            )}
           </div>
         </div>
 
