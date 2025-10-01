@@ -75,7 +75,7 @@ func (api *StationsAPI) ListStations(w http.ResponseWriter, r *http.Request) {
 	query := `
 		SELECT id, identity, name, model, vendor, max_output_kw, total_energy_wh, firmware, last_seen
 		FROM chargers
-		ORDER BY last_seen DESC NULLS LAST, identity
+		ORDER BY id ASC
 	`
 
 	rows, err := api.db.QueryContext(r.Context(), query)
