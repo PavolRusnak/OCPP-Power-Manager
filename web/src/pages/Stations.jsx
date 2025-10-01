@@ -209,18 +209,18 @@ function Stations() {
           <div className="px-4 sm:px-6 lg:px-8 py-8 w-full max-w-9xl mx-auto">
       {/* Page header */}
       <div className="sm:flex sm:justify-between sm:items-center mb-8">
-        {/* Left: Title */}
-        <div className="mb-4 sm:mb-0">
+        {/* Left: Title with Live indicator */}
+        <div className="mb-4 sm:mb-0 flex items-center gap-4">
           <h1 className="text-2xl md:text-3xl text-gray-800 dark:text-gray-100 font-bold">Stations</h1>
-        </div>
-
-        {/* Right: Actions */}
-        <div className="grid grid-flow-col sm:auto-cols-max justify-start sm:justify-end gap-2">
           {/* Live update indicator */}
           <div className="flex items-center text-sm text-gray-500 dark:text-gray-400">
             <div className="w-2 h-2 bg-green-500 rounded-full mr-2 animate-pulse"></div>
             <span>Live • Updated {formatLastSeen(lastUpdate)}</span>
           </div>
+        </div>
+
+        {/* Right: Actions */}
+        <div className="grid grid-flow-col sm:auto-cols-max justify-start sm:justify-end gap-2">
           {/* Search form */}
           <div className="relative">
             <input
@@ -336,11 +336,6 @@ function Stations() {
                     <td className="px-2 py-3 whitespace-nowrap">
                       <div className="text-left">
                         <div className="font-mono text-sm">{formatLastSeen(station.last_seen)}</div>
-                        {station.last_seen && (
-                          <div className="text-xs text-gray-500 dark:text-gray-400">
-                            {new Date(station.last_seen).toLocaleTimeString()}
-                          </div>
-                        )}
                       </div>
                     </td>
                     <td className="px-2 py-3 whitespace-nowrap">

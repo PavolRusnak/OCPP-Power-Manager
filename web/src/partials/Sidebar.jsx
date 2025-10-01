@@ -15,7 +15,7 @@ function Sidebar({
   const sidebar = useRef(null);
 
   const storedSidebarExpanded = localStorage.getItem("sidebar-expanded");
-  const [sidebarExpanded, setSidebarExpanded] = useState(storedSidebarExpanded === null ? false : storedSidebarExpanded === "true");
+  const [sidebarExpanded, setSidebarExpanded] = useState(storedSidebarExpanded === null ? true : storedSidebarExpanded === "true");
 
   // close on click outside
   useEffect(() => {
@@ -140,6 +140,22 @@ function Sidebar({
                   </div>
                 </NavLink>
               </li>
+              {/* Logs tab temporarily hidden */}
+              {/* <li className={`pl-4 pr-3 py-2 rounded-lg mb-0.5 last:mb-0 bg-linear-to-r ${pathname === "/logs" && "from-violet-500/[0.12] dark:from-violet-500/[0.24] to-violet-500/[0.04]"}`}>
+                <NavLink
+                  end
+                  to="/logs"
+                  className={`block text-gray-800 dark:text-gray-100 truncate transition duration-150 ${
+                    pathname === "/logs" ? "" : "hover:text-gray-900 dark:hover:text-white"
+                  }`}
+                >
+                  <div className="flex items-center">
+                    <span className="text-sm font-medium lg:opacity-0 lg:sidebar-expanded:opacity-100 2xl:opacity-100 duration-200">
+                      Logs
+                    </span>
+                  </div>
+                </NavLink>
+              </li> */}
             </ul>
           </div>
         </div>

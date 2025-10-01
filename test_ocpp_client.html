@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>OCPP WebSocket Test</title>
+</head>
+<body>
+    <h1>OCPP WebSocket Test</h1>
+    <div id="status">Connecting...</div>
+    <div id="messages"></div>
+    
+    <script>
+        const statusDiv = document.getElementById('status');
+        const messagesDiv = document.getElementById('messages');
+        
+        // Connect to OCPP WebSocket endpoint
+        const ws = new WebSocket('ws://localhost:8080/ocpp16/test-charger', ['ocpp1.6']);
+        
+        ws.onopen = function(event) {
+            statusDiv.textContent = 'Connected to OCPP server';
+            statusDiv.style.color = 'green';
+            
+            // Send a BootNotification message
+            const bootNotification = [
+                2, // CALL
+                "123", // Message ID
+                "BootNotification", // Action
+                {
+                    "chargePointModel": "Test Model",
+                    "chargePointVendor": "Test Vendor",
+                    "firmwareVersion": "1.0.0"
+                }
+            ];
+            
+            ws.send(JSON.stringify(bootNotification));
+            addMessage('Sent BootNotification');
+        };
+        
+        ws.onmessage = function(event) {
+            addMessage('Received: ' + event.data);
+        };
+        
+        ws.onerror = function(error) {
+            statusDiv.textContent = 'Error: ' + error;
+            statusDiv.style.color = 'red';
+        };
+        
+        ws.onclose = function(event) {
+            statusDiv.textContent = 'Connection closed';
+            statusDiv.style.color = 'orange';
+        };
+        
+        function addMessage(message) {
+            const div = document.createElement('div');
+            div.textContent = new Date().toLocaleTimeString() + ': ' + message;
+            messagesDiv.appendChild(div);
+        }
+    </script>
+</body>
+</html>

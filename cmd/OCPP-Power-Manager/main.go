@@ -22,13 +22,13 @@ import (
 
 func main() {
 	// Initialize logger
-	logger, err := zap.NewProduction()
+	logger, err := zap.NewDevelopment()
 	if err != nil {
 		log.Fatal("Failed to initialize logger:", err)
 	}
 	defer logger.Sync()
 
-	logger.Info("Starting OCPP Power Manager")
+	logger.Info("🚀 Starting OCPP Power Manager - EV Charging Station Management System")
 
 	// Load configuration
 	cfg, err := config.Load()
@@ -36,7 +36,7 @@ func main() {
 		logger.Fatal("Failed to load configuration", zap.Error(err))
 	}
 
-	logger.Info("Configuration loaded",
+	logger.Info("⚙️ Configuration loaded successfully",
 		zap.String("http_addr", cfg.HTTPAddr),
 		zap.String("db_driver", cfg.DBDriver),
 		zap.String("db_dsn", maskDSN(cfg.DBDSN)),
@@ -54,7 +54,7 @@ func main() {
 		}
 	}()
 
-	logger.Info("Database connection established")
+	logger.Info("🗄️ Database connection established successfully")
 
 	// Run migrations if requested
 	if os.Getenv("RUN_MIGRATIONS") == "1" {
@@ -80,6 +80,11 @@ func main() {
 	// Create API instance with OCPP server
 	api := httpapi.New(database, logger, ocppServer)
 
+	// Logs scheduler temporarily disabled
+	// logsScheduler := httpapi.NewLogsScheduler(database, logger)
+	// logsScheduler.Start()
+	// defer logsScheduler.Stop()
+
 	// API routes
 	r.Route("/api", func(r chi.Router) {
 		r.Mount("/", api.Routes())
@@ -96,13 +101,18 @@ func main() {
 
 	// Start server in a goroutine
 	go func() {
-		logger.Info("Starting HTTP server", zap.String("addr", cfg.HTTPAddr))
+		logger.Info("🌐 Starting HTTP server", zap.String("addr", cfg.HTTPAddr), zap.String("url", "http://localhost:8080"))
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			logger.Fatal("HTTP server failed", zap.Error(err))
 		}
 	}()
 
 	// Wait for interrupt signal to gracefully shutdown the server
+	logger.Info("✅ OCPP Power Manager is running! Open http://localhost:8080 in your browser")
+	logger.Info("📱 Web interface ready - Manage your EV charging stations")
+	logger.Info("🔌 OCPP server ready - Stations can connect to ws://localhost:8080/ocpp16/{station_id}")
+	logger.Info("⏹️ Press Ctrl+C to stop the server")
+	
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit

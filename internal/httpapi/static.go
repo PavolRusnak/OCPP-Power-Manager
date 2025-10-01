@@ -1,27 +1,15 @@
 package httpapi
 
 import (
-	"embed"
-	"io"
-	"io/fs"
 	"net/http"
+	"os"
 	"path/filepath"
 	"strings"
-	"time"
 )
 
-//go:embed static/*
-var staticFiles embed.FS
-
-// StaticHandler serves the embedded static files
+// StaticHandler serves static files from the filesystem
 func StaticHandler() http.Handler {
-	// Get the embedded filesystem
-	fsys, err := fs.Sub(staticFiles, "static")
-	if err != nil {
-		panic(err)
-	}
-
-	// Create a custom handler that serves index.html for SPA routes
+	// Create a custom handler that serves files from the static directory
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Check if the requested file exists
 		path := strings.TrimPrefix(r.URL.Path, "/")
@@ -29,25 +17,22 @@ func StaticHandler() http.Handler {
 			path = "index.html"
 		}
 
-		// Try to open the file
-		file, err := fsys.Open(path)
-		if err != nil {
+		// Build the full file path
+		fullPath := filepath.Join("internal", "httpapi", "static", path)
+
+		// Check if file exists
+		if _, err := os.Stat(fullPath); os.IsNotExist(err) {
 			// If file doesn't exist, serve index.html for SPA routing
-			indexFile, err := fsys.Open("index.html")
-			if err != nil {
+			indexPath := filepath.Join("internal", "httpapi", "static", "index.html")
+			if _, err := os.Stat(indexPath); os.IsNotExist(err) {
 				http.NotFound(w, r)
 				return
 			}
-			defer indexFile.Close()
-
-			// Set content type
-			w.Header().Set("Content-Type", "text/html")
-			http.ServeContent(w, r, "index.html", time.Time{}, indexFile.(io.ReadSeeker))
+			http.ServeFile(w, r, indexPath)
 			return
 		}
-		defer file.Close()
 
 		// File exists, serve it normally
-		http.ServeContent(w, r, filepath.Base(path), time.Time{}, file.(io.ReadSeeker))
+		http.ServeFile(w, r, fullPath)
 	})
 }

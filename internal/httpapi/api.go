@@ -39,6 +39,8 @@ func (a *API) Routes() chi.Router {
 	r.Mount("/seed", NewSeedAPI(a.db, a.logger).Routes())
 	r.Mount("/dev", NewDevAPI(a.db, a.logger).Routes())
 	r.Mount("/settings", NewSettingsAPI(a.db, a.logger, a.ocppServer).Routes())
+	r.Mount("/network", NewNetworkAPI(a.logger).Routes())
+	r.Mount("/logs", NewLogsAPI(a.db, a.logger).Routes())
 
 	return r
 }

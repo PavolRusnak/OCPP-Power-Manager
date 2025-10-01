@@ -54,7 +54,7 @@ func (api *SettingsAPI) GetSettings(w http.ResponseWriter, r *http.Request) {
 	defer rows.Close()
 
 	settings := Settings{
-		HeartbeatInterval: "300",  // default
+		HeartbeatInterval: "30",   // default
 		LogLevel:          "info", // default
 	}
 

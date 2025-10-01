@@ -16,7 +16,14 @@ function OCPPSettings() {
   });
   const [serverActionLoading, setServerActionLoading] = useState(false);
   const [settings, setSettings] = useState({
-    heartbeatInterval: '300'
+    heartbeatInterval: '30'
+  });
+  const [networkInfo, setNetworkInfo] = useState({
+    hotspot: {
+      ip_address: '192.168.137.1',
+      subnet_mask: '255.255.255.0',
+      is_reachable: true
+    }
   });
 
   // Fetch settings and server status on component mount
@@ -41,6 +48,15 @@ function OCPPSettings() {
         }
         const statusData = await statusResponse.json();
         setServerStatus(statusData);
+
+        // Fetch hotspot information (lightweight, no network checking)
+        const hotspotResponse = await fetch('/api/network/hotspot');
+        if (hotspotResponse.ok) {
+          const hotspotData = await hotspotResponse.json();
+          setNetworkInfo({
+            hotspot: hotspotData
+          });
+        }
       } catch (error) {
         setError(error);
       } finally {
@@ -119,11 +135,6 @@ function OCPPSettings() {
     }
   };
 
-  const handleTestConnection = () => {
-    // TODO: Implement connection test
-    console.log('Testing OCPP connection...');
-    alert('Connection test initiated!');
-  };
 
   return (
     <div className="flex h-screen overflow-hidden">
@@ -162,62 +173,9 @@ function OCPPSettings() {
         </div>
       )}
 
-      {/* Settings Form */}
-      <div className="bg-white dark:bg-gray-800 shadow-lg rounded-lg border border-gray-200 dark:border-gray-700 p-6">
-        {loading ? (
-          <div className="text-center py-8">
-            <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-violet-500"></div>
-            <p className="mt-2 text-gray-600 dark:text-gray-400">Loading settings...</p>
-          </div>
-        ) : (
-          <form onSubmit={handleSave}>
-            <div className="space-y-6">
-              <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4">OCPP Configuration</h3>
-              
-              <div>
-                <label className="block text-gray-700 dark:text-gray-300 text-sm font-bold mb-2" htmlFor="heartbeatInterval">
-                  Heartbeat Interval (seconds)
-                </label>
-                <input
-                  type="number"
-                  id="heartbeatInterval"
-                  name="heartbeatInterval"
-                  value={settings.heartbeatInterval}
-                  onChange={handleInputChange}
-                  className="form-input w-full"
-                  placeholder="300"
-                  min="30"
-                  max="3600"
-                  required
-                />
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">How often stations send heartbeat messages</p>
-              </div>
-
-            </div>
-
-          {/* Action Buttons */}
-          <div className="flex justify-end space-x-3 mt-8 pt-6 border-t border-gray-200 dark:border-gray-700">
-            <button
-              type="button"
-              onClick={handleTestConnection}
-              className="btn bg-blue-500 hover:bg-blue-600 text-white"
-            >
-              Test Connection
-            </button>
-            <button
-              type="submit"
-              disabled={saving}
-              className="btn bg-violet-500 hover:bg-violet-600 text-white disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {saving ? 'Saving...' : 'Save Settings'}
-            </button>
-          </div>
-        </form>
-        )}
-      </div>
 
       {/* Connection Status */}
-      <div className="mt-6 bg-white dark:bg-gray-800 shadow-lg rounded-lg border border-gray-200 dark:border-gray-700 p-6">
+      <div className="bg-white dark:bg-gray-800 shadow-lg rounded-lg border border-gray-200 dark:border-gray-700 p-6">
         <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4">Connection Status</h3>
         <div className="flex items-center space-x-3">
           <div className={`w-3 h-3 rounded-full ${serverStatus.ocppServerRunning ? 'bg-green-500' : 'bg-red-500'}`}></div>
@@ -232,6 +190,14 @@ function OCPPSettings() {
           <p className="text-sm text-gray-500 dark:text-gray-400">
             <strong>OCPP Endpoint:</strong> {serverStatus.ocppEndpoint}
           </p>
+          <p className="text-sm text-gray-500 dark:text-gray-400">
+            <strong>Charger WebSocket URL:</strong>
+          </p>
+          <div className="bg-gray-100 dark:bg-gray-700 rounded p-2 mt-1">
+            <code className="text-sm font-mono text-blue-600 dark:text-blue-400">
+              ws://{networkInfo.hotspot.ip_address}:8080/ocpp16/[CHARGER_ID]
+            </code>
+          </div>
         </div>
         <p className="text-sm text-gray-500 dark:text-gray-400 mt-3">
           {serverStatus.ocppServerRunning 
@@ -267,6 +233,54 @@ function OCPPSettings() {
           </button>
         </div>
       </div>
+
+      {/* Settings Form */}
+      <div className="mt-6 bg-white dark:bg-gray-800 shadow-lg rounded-lg border border-gray-200 dark:border-gray-700 p-6">
+        {loading ? (
+          <div className="text-center py-8">
+            <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-violet-500"></div>
+            <p className="mt-2 text-gray-600 dark:text-gray-400">Loading settings...</p>
+          </div>
+        ) : (
+          <form onSubmit={handleSave}>
+            <div className="space-y-6">
+              <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4">OCPP Configuration</h3>
+              
+              <div>
+                <label className="block text-gray-700 dark:text-gray-300 text-sm font-bold mb-2" htmlFor="heartbeatInterval">
+                  Heartbeat Interval (seconds)
+                </label>
+                <input
+                  type="number"
+                  id="heartbeatInterval"
+                  name="heartbeatInterval"
+                  value={settings.heartbeatInterval}
+                  onChange={handleInputChange}
+                  className="form-input w-full"
+                  placeholder="30"
+                  min="30"
+                  max="3600"
+                  required
+                />
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">How often stations send heartbeat messages</p>
+              </div>
+
+            </div>
+
+          {/* Action Buttons */}
+          <div className="flex justify-end space-x-3 mt-8 pt-6 border-t border-gray-200 dark:border-gray-700">
+            <button
+              type="submit"
+              disabled={saving}
+              className="btn bg-violet-500 hover:bg-violet-600 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {saving ? 'Saving...' : 'Save Settings'}
+            </button>
+          </div>
+        </form>
+        )}
+      </div>
+
           </div>
         </main>
 
