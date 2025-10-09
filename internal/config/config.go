@@ -15,7 +15,7 @@ type Config struct {
 // Load loads configuration from environment variables with defaults
 func Load() (*Config, error) {
 	cfg := &Config{
-		HTTPAddr: getEnv("HTTP_ADDR", ":8080"),
+		HTTPAddr: getEnv("HTTP_ADDR", "192.168.137.1:9999"),
 		DBDriver: getEnv("DB_DRIVER", "sqlite"),
 		DBDSN:    getEnv("DB_DSN", "file:ocpppm.db?_foreign_keys=on"),
 	}

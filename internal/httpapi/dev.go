@@ -128,17 +128,35 @@ func (api *DevAPI) SimulateMeterValues(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Update total_energy_wh using monotonic cumulative register logic
+	// Get the previous meter reading to calculate incremental energy
+	var previousMeterReading float64
+	err = api.db.QueryRowContext(r.Context(), 
+		"SELECT value FROM meter_values WHERE transaction_id IN (SELECT id FROM transactions WHERE charger_id = ?) AND measurand = 'Energy.Active.Import.Register' ORDER BY ts DESC LIMIT 1", 
+		chargerID).Scan(&previousMeterReading)
+	
+	// Calculate incremental energy (current reading - previous reading)
+	incrementalEnergy := req.ValueWh - previousMeterReading
+	if incrementalEnergy < 0 {
+		// Meter reset or out-of-order reading, ignore
+		api.logger.Info("Ignoring negative incremental energy (meter reset or out-of-order reading)",
+			zap.String("identity", req.Identity),
+			zap.Float64("current_reading", req.ValueWh),
+			zap.Float64("previous_reading", previousMeterReading),
+			zap.Float64("incremental_energy", incrementalEnergy))
+		http.Error(w, "Negative incremental energy - meter reset or out-of-order reading", http.StatusBadRequest)
+		return
+	}
+
+	// Add incremental energy to total_energy_wh
 	updateQuery := `
 		UPDATE chargers 
-		SET total_energy_wh = ? 
-		WHERE id = ? AND (? >= total_energy_wh OR total_energy_wh IS NULL)
+		SET total_energy_wh = COALESCE(total_energy_wh, 0) + ?
+		WHERE id = ?
 	`
 
 	updateResult, err := api.db.ExecContext(r.Context(), updateQuery,
-		int64(req.ValueWh),
+		int64(incrementalEnergy),
 		chargerID,
-		int64(req.ValueWh),
 	)
 
 	if err != nil {
@@ -150,25 +168,29 @@ func (api *DevAPI) SimulateMeterValues(w http.ResponseWriter, r *http.Request) {
 	rowsAffected, _ := updateResult.RowsAffected()
 	status := "updated"
 	if rowsAffected == 0 {
-		status = "ignored (decreasing value)"
+		status = "no rows affected"
 	}
 
 	api.logger.Info("Simulated MeterValues update",
 		zap.String("identity", req.Identity),
 		zap.Int64("charger_id", chargerID),
-		zap.Float64("value_wh", req.ValueWh),
+		zap.Float64("current_meter_reading", req.ValueWh),
+		zap.Float64("previous_meter_reading", previousMeterReading),
+		zap.Float64("incremental_energy_wh", incrementalEnergy),
 		zap.String("status", status),
 	)
 
 	// Return success response
 	response := map[string]interface{}{
-		"success":    true,
-		"identity":   req.Identity,
-		"charger_id": chargerID,
-		"value_wh":   req.ValueWh,
-		"value_kwh":  req.ValueWh / 1000.0,
-		"timestamp":  timestamp.Format(time.RFC3339),
-		"status":     status,
+		"success":                true,
+		"identity":               req.Identity,
+		"charger_id":             chargerID,
+		"current_meter_reading":  req.ValueWh,
+		"previous_meter_reading": previousMeterReading,
+		"incremental_energy_wh":  incrementalEnergy,
+		"incremental_energy_kwh": incrementalEnergy / 1000.0,
+		"timestamp":              timestamp.Format(time.RFC3339),
+		"status":                 status,
 	}
 
 	w.Header().Set("Content-Type", "application/json")

@@ -23,10 +23,11 @@ import (
 // Server manages communication with electric vehicle charging stations
 // It handles WebSocket connections and processes OCPP messages from chargers
 type Server struct {
-	db      *sql.DB       // Database connection for storing charger data
-	logger  *zap.Logger   // Logger for recording events and errors
-	cs      *ocppj.Server // OCPP library server (not currently used)
-	running bool          // Whether the server is active and accepting connections
+	db          *sql.DB                    // Database connection for storing charger data
+	logger      *zap.Logger                // Logger for recording events and errors
+	cs          *ocppj.Server              // OCPP library server (not currently used)
+	running     bool                       // Whether the server is active and accepting connections
+	connections map[string]*websocket.Conn // Map of charger ID to WebSocket connection
 }
 
 // New creates a new server to handle charging station connections
@@ -39,10 +40,11 @@ func New(db *sql.DB, logger *zap.Logger) *Server {
 	cs := ocppj.NewServer(wsServer, nil, nil, core.Profile)
 
 	s := &Server{
-		db:      db,
-		logger:  logger,
-		cs:      cs,
-		running: true, // Server is ready to accept connections
+		db:          db,
+		logger:      logger,
+		cs:          cs,
+		running:     true, // Server is ready to accept connections
+		connections: make(map[string]*websocket.Conn),
 	}
 
 	// Register handlers (not used since we handle WebSocket manually)
@@ -57,87 +59,74 @@ func New(db *sql.DB, logger *zap.Logger) *Server {
 func (s *Server) Mount(r chi.Router) {
 	// Set up the WebSocket endpoint for charger connections
 	r.HandleFunc("/ocpp16/{id}", s.handleOCPPConnection)
-	s.logger.Info("🔌 OCPP 1.6J server mounted at /ocpp16 - Ready for EV charging station connections")
+	s.logger.Info("🔌 OCPP 1.6J server mounted at /ocpp16 - Ready for EV charging stations")
 }
 
-// Start activates the server to accept new charger connections
+// Start starts the OCPP server
 func (s *Server) Start() {
 	s.running = true
 	s.logger.Info("OCPP server started")
 }
 
-// Stop deactivates the server and prevents new connections
+// Stop stops the OCPP server
 func (s *Server) Stop() {
 	s.running = false
 	s.logger.Info("OCPP server stopped")
 }
 
-// IsRunning tells us if the server is currently accepting connections
+// IsRunning returns whether the OCPP server is running
 func (s *Server) IsRunning() bool {
 	return s.running
 }
 
-// handleOCPPConnection is the main function that handles when a charging station connects
-// It upgrades the HTTP connection to WebSocket and then processes all messages from the charger
+// handleOCPPConnection handles WebSocket connections from charging stations
 func (s *Server) handleOCPPConnection(w http.ResponseWriter, r *http.Request) {
-	// Check if server is running
-	if !s.running {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusServiceUnavailable)
-		w.Write([]byte(`{"error": "OCPP server is stopped"}`))
+	// Get the charger ID from the URL parameter
+	chargerID := chi.URLParam(r, "id")
+	if chargerID == "" {
+		http.Error(w, "Charger ID is required", http.StatusBadRequest)
 		return
 	}
 
-	// Get the charger's ID from the URL (like /ocpp16/8913)
-	chargePointId := chi.URLParam(r, "id")
-	if chargePointId == "" {
-		http.Error(w, "Missing charge point ID", http.StatusBadRequest)
-		return
-	}
+	s.logger.Info("New WebSocket connection attempt", zap.String("charger_id", chargerID))
 
-	s.logger.Info("Charging station trying to connect", zap.String("charge_point_id", chargePointId))
-
-	// Convert HTTP connection to WebSocket so we can have real-time communication
+	// Upgrade HTTP connection to WebSocket
 	upgrader := websocket.Upgrader{
 		CheckOrigin: func(r *http.Request) bool {
-			return true // Allow all chargers to connect (in production, you'd check this)
+			return true // Allow all origins for now
 		},
-		Subprotocols: []string{"ocpp1.6"}, // Tell the charger we support OCPP 1.6
 	}
 
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
-		s.logger.Error("Failed to upgrade to WebSocket", zap.Error(err))
+		s.logger.Error("Failed to upgrade connection to WebSocket", zap.Error(err))
 		return
 	}
-	defer conn.Close() // Make sure we close the connection when done
+	defer conn.Close()
 
-	// Get client IP information
-	clientIP := getClientIP(r)
-	s.logger.Info("Charging station connected successfully",
-		zap.String("charge_point_id", chargePointId),
-		zap.String("client_ip", clientIP))
+	s.logger.Info("WebSocket connection established", zap.String("charger_id", chargerID))
 
-	// Keep listening for messages from the charger
+	// Store the connection for this charger
+	s.connections[chargerID] = conn
+
+	// Handle WebSocket messages
 	for {
 		_, message, err := conn.ReadMessage()
 		if err != nil {
-			// Check if it's an unexpected disconnection
 			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
-				s.logger.Error("Charger disconnected unexpectedly", zap.Error(err))
+				s.logger.Error("WebSocket error", zap.Error(err))
 			}
-			s.logger.Info("Charging station disconnected", zap.String("charge_point_id", chargePointId))
 			break
 		}
 
-		// Process the message from the charger
-		response, err := s.processOCPPMessage(chargePointId, message)
+		// Process the OCPP message
+		response, err := s.processOCPPMessage(chargerID, message)
 		if err != nil {
-			s.logger.Error("Failed to process message from charger", zap.Error(err))
+			s.logger.Error("Failed to process OCPP message", zap.Error(err))
 			continue
 		}
 
-		// Send our response back to the charger
+		// Send response back to charger
 		if response != nil {
 			if err := conn.WriteMessage(websocket.TextMessage, response); err != nil {
 				s.logger.Error("Failed to send response to charger", zap.Error(err))
@@ -145,6 +134,10 @@ func (s *Server) handleOCPPConnection(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
+
+	// Remove the connection when it's closed
+	delete(s.connections, chargerID)
+	s.logger.Info("WebSocket connection closed", zap.String("charger_id", chargerID))
 }
 
 // handleNewClient handles new client connections
@@ -367,27 +360,22 @@ func (s *Server) OnStopTransaction(chargePointId string, request *core.StopTrans
 
 // OnMeterValues handles MeterValues requests
 func (s *Server) OnMeterValues(chargePointId string, request *core.MeterValuesRequest) (*core.MeterValuesConfirmation, error) {
+	var txIDStr string
+	if request.TransactionId != nil {
+		txIDStr = fmt.Sprintf("%d", *request.TransactionId)
+	} else {
+		txIDStr = "none"
+	}
+
 	s.logger.Info("MeterValues received",
 		zap.String("charge_point_id", chargePointId),
-		zap.Int("tx_id", *request.TransactionId),
+		zap.String("tx_id", txIDStr),
 		zap.Int("meter_values", len(request.MeterValue)),
 	)
 
-	if request.TransactionId == nil {
-		return &core.MeterValuesConfirmation{}, nil
-	}
-
-	// Get transaction ID
-	var transactionID int64
-	err := s.db.QueryRowContext(context.Background(), "SELECT id FROM transactions WHERE tx_id = ?", *request.TransactionId).Scan(&transactionID)
-	if err != nil {
-		s.logger.Error("Failed to get transaction ID", zap.Error(err))
-		return &core.MeterValuesConfirmation{}, nil
-	}
-
 	// Get charger ID for updating total_energy_wh
 	var chargerID int64
-	err = s.db.QueryRowContext(context.Background(), "SELECT charger_id FROM transactions WHERE id = ?", transactionID).Scan(&chargerID)
+	err := s.db.QueryRowContext(context.Background(), "SELECT id FROM chargers WHERE identity = ?", chargePointId).Scan(&chargerID)
 	if err != nil {
 		s.logger.Error("Failed to get charger ID", zap.Error(err))
 		return &core.MeterValuesConfirmation{}, nil
@@ -403,42 +391,49 @@ func (s *Server) OnMeterValues(chargePointId string, request *core.MeterValuesRe
 					continue
 				}
 
-				// Convert to Wh if needed (assume kWh if value > 1000)
+				// Use the value as-is since it's already in Wh
 				valueWh := value
-				if value > 1000 {
-					valueWh = value * 1000
+
+				// If we have a transaction ID, insert meter value into the database
+				if request.TransactionId != nil {
+					// Get transaction ID
+					var transactionID int64
+					err = s.db.QueryRowContext(context.Background(), "SELECT id FROM transactions WHERE tx_id = ?", *request.TransactionId).Scan(&transactionID)
+					if err != nil {
+						s.logger.Error("Failed to get transaction ID", zap.Error(err))
+						continue
+					}
+
+					// Insert meter value
+					insertQuery := `
+						INSERT INTO meter_values (transaction_id, ts, measurand, value)
+						VALUES (?, ?, ?, ?)
+					`
+
+					_, err = s.db.ExecContext(context.Background(), insertQuery,
+						transactionID,
+						mv.Timestamp.Time,
+						sample.Measurand,
+						valueWh,
+					)
+
+					if err != nil {
+						s.logger.Error("Failed to insert meter value", zap.Error(err))
+						continue
+					}
 				}
 
-				// Insert meter value
-				insertQuery := `
-					INSERT INTO meter_values (transaction_id, ts, measurand, value)
-					VALUES (?, ?, ?, ?)
-				`
-
-				_, err = s.db.ExecContext(context.Background(), insertQuery,
-					transactionID,
-					mv.Timestamp.Time,
-					sample.Measurand,
-					valueWh,
-				)
-
-				if err != nil {
-					s.logger.Error("Failed to insert meter value", zap.Error(err))
-					continue
-				}
-
-				// Update total_energy_wh using monotonic cumulative register logic
-				// Only update if new_value_wh >= current_total
+				// Set total_energy_wh to the current cumulative meter reading
+				// Energy.Active.Import.Register is the total energy delivered by this charger since installation
 				updateQuery := `
 					UPDATE chargers 
-					SET total_energy_wh = ? 
-					WHERE id = ? AND (? >= total_energy_wh OR total_energy_wh IS NULL)
+					SET total_energy_wh = ?
+					WHERE id = ?
 				`
 
 				result, err := s.db.ExecContext(context.Background(), updateQuery,
 					int64(valueWh),
 					chargerID,
-					int64(valueWh),
 				)
 
 				if err != nil {
@@ -448,16 +443,11 @@ func (s *Server) OnMeterValues(chargePointId string, request *core.MeterValuesRe
 
 				rowsAffected, _ := result.RowsAffected()
 				if rowsAffected > 0 {
-					s.logger.Info("Updated total_energy_wh",
+					s.logger.Info("Updated total_energy_wh from charger's cumulative meter reading",
 						zap.String("charge_point_id", chargePointId),
 						zap.Int64("charger_id", chargerID),
-						zap.Float64("new_value_wh", valueWh),
-					)
-				} else {
-					s.logger.Info("Ignored decreasing total_energy_wh",
-						zap.String("charge_point_id", chargePointId),
-						zap.Int64("charger_id", chargerID),
-						zap.Float64("new_value_wh", valueWh),
+						zap.Float64("meter_reading_wh", valueWh),
+						zap.Float64("meter_reading_kwh", valueWh/1000.0),
 					)
 				}
 			}
@@ -762,10 +752,28 @@ func (s *Server) handleStatusNotificationRequest(chargePointId string, payload i
 		s.logger.Error("Failed to update charger last seen time", zap.Error(err))
 	}
 
-	// In a real system, you might also want to:
-	// 1. Parse the status (Available, Occupied, Faulted, etc.)
-	// 2. Update the charger's current status in the database
-	// 3. Send alerts if the charger reports an error
+	// Parse the status to check if charger just became available (connected)
+	payloadMap, ok := payload.(map[string]interface{})
+	if ok {
+		status, _ := payloadMap["status"].(string)
+		connectorId, _ := payloadMap["connectorId"].(float64)
+
+		s.logger.Info("Status notification details",
+			zap.String("charge_point_id", chargePointId),
+			zap.String("status", status),
+			zap.Float64("connector_id", connectorId))
+
+		// When connector 1 reports Available, request meter values
+		if status == "Available" && connectorId == 1 {
+			s.logger.Info("Charger connector 1 available, will trigger meter values request after response",
+				zap.String("charge_point_id", chargePointId))
+			// Trigger meter values after a short delay to avoid concurrent writes
+			go func() {
+				time.Sleep(100 * time.Millisecond)
+				s.sendTriggerMessage(chargePointId, "MeterValues")
+			}()
+		}
+	}
 
 	return map[string]interface{}{}
 }
@@ -774,6 +782,13 @@ func (s *Server) handleStatusNotificationRequest(chargePointId string, payload i
 // This is where we get the actual energy consumption data and update our database
 func (s *Server) handleMeterValuesRequest(chargePointId string, payload interface{}) interface{} {
 	s.logger.Info("Energy meter reading received from charger", zap.String("charge_point_id", chargePointId))
+
+	// Update when we last heard from this charger (for online/offline status)
+	query := `UPDATE chargers SET last_seen = ? WHERE identity = ?`
+	_, err := s.db.ExecContext(context.Background(), query, time.Now(), chargePointId)
+	if err != nil {
+		s.logger.Error("Failed to update charger last seen time", zap.Error(err))
+	}
 
 	// Parse the meter values data from the charger
 	payloadMap, ok := payload.(map[string]interface{})
@@ -826,11 +841,8 @@ func (s *Server) handleMeterValuesRequest(chargePointId string, payload interfac
 					continue
 				}
 
-				// Convert to Wh if needed (some chargers send kWh)
+				// Use the value as-is since it's already in Wh
 				valueWh := value
-				if value > 1000 {
-					valueWh = value * 1000
-				}
 
 				// Find the charger in our database
 				var chargerID int64
@@ -840,17 +852,17 @@ func (s *Server) handleMeterValuesRequest(chargePointId string, payload interfac
 					continue
 				}
 
-				// Update the total energy reading (only if it's higher than current)
+				// Set total_energy_wh to the current cumulative meter reading
+				// Energy.Active.Import.Register is the total energy delivered by this charger since installation
 				updateQuery := `
 					UPDATE chargers 
-					SET total_energy_wh = ? 
-					WHERE id = ? AND (? >= total_energy_wh OR total_energy_wh IS NULL)
+					SET total_energy_wh = ?
+					WHERE id = ?
 				`
 
 				result, err := s.db.ExecContext(context.Background(), updateQuery,
 					int64(valueWh),
 					chargerID,
-					int64(valueWh),
 				)
 
 				if err != nil {
@@ -860,15 +872,10 @@ func (s *Server) handleMeterValuesRequest(chargePointId string, payload interfac
 
 				rowsAffected, _ := result.RowsAffected()
 				if rowsAffected > 0 {
-					s.logger.Info("Updated total energy consumption",
+					s.logger.Info("Updated total_energy_wh from charger's cumulative meter reading",
 						zap.String("charge_point_id", chargePointId),
-						zap.Float64("energy_wh", valueWh),
-						zap.Float64("energy_kwh", valueWh/1000.0),
-					)
-				} else {
-					s.logger.Info("Ignored decreasing energy reading (meter reset?)",
-						zap.String("charge_point_id", chargePointId),
-						zap.Float64("energy_wh", valueWh),
+						zap.Float64("meter_reading_wh", valueWh),
+						zap.Float64("meter_reading_kwh", valueWh/1000.0),
 					)
 				}
 			}
@@ -1067,4 +1074,101 @@ func getClientIP(r *http.Request) string {
 		return r.RemoteAddr
 	}
 	return ip
+}
+
+// sendTriggerMessage sends a TriggerMessage request to the charging station
+func (s *Server) sendTriggerMessage(chargePointId string, requestedMessage string) {
+	// Check if we have a connection for this charger
+	conn, exists := s.connections[chargePointId]
+	if !exists {
+		s.logger.Error("No WebSocket connection found for charger", zap.String("charge_point_id", chargePointId))
+		return
+	}
+
+	// Create TriggerMessage request (OCPP 1.6)
+	request := map[string]interface{}{
+		"requestedMessage": requestedMessage,
+		"connectorId":      0, // 0 means the whole charge point
+	}
+
+	// Convert to OCPP message format: [2, messageId, "TriggerMessage", payload]
+	messageId := fmt.Sprintf("trigger_%s_%d", requestedMessage, time.Now().Unix())
+	ocppMessage := []interface{}{
+		2,                // CALL (request)
+		messageId,        // unique message ID
+		"TriggerMessage", // action
+		request,          // payload
+	}
+
+	// Marshal to JSON
+	messageBytes, err := json.Marshal(ocppMessage)
+	if err != nil {
+		s.logger.Error("Failed to marshal TriggerMessage request", zap.Error(err))
+		return
+	}
+
+	s.logger.Info("Sending TriggerMessage request to charger",
+		zap.String("charge_point_id", chargePointId),
+		zap.String("requested_message", requestedMessage),
+		zap.String("message_id", messageId))
+
+	// Send the message to the charger via WebSocket
+	if err := conn.WriteMessage(websocket.TextMessage, messageBytes); err != nil {
+		s.logger.Error("Failed to send TriggerMessage request to charger",
+			zap.String("charge_point_id", chargePointId),
+			zap.Error(err))
+		return
+	}
+
+	s.logger.Info("TriggerMessage request sent successfully",
+		zap.String("charge_point_id", chargePointId),
+		zap.String("requested_message", requestedMessage),
+		zap.String("message_id", messageId))
+}
+
+// requestMeterValues sends a GetMeterValues request to the charging station
+func (s *Server) requestMeterValues(chargePointId string) {
+	// Create GetMeterValues request
+	request := map[string]interface{}{
+		"connectorId": 0, // 0 means main meter for the entire charge point
+	}
+
+	// Convert to OCPP message format: [2, messageId, "GetMeterValues", payload]
+	messageId := fmt.Sprintf("get_meter_%d", time.Now().Unix())
+	ocppMessage := []interface{}{
+		2,                // CALL (request)
+		messageId,        // unique message ID
+		"GetMeterValues", // action
+		request,          // payload
+	}
+
+	// Marshal to JSON
+	messageBytes, err := json.Marshal(ocppMessage)
+	if err != nil {
+		s.logger.Error("Failed to marshal GetMeterValues request", zap.Error(err))
+		return
+	}
+
+	s.logger.Info("Sending GetMeterValues request to charger",
+		zap.String("charge_point_id", chargePointId),
+		zap.String("message_id", messageId))
+
+	// Check if we have a connection for this charger
+	conn, exists := s.connections[chargePointId]
+	if !exists {
+		s.logger.Error("No WebSocket connection found for charger", zap.String("charge_point_id", chargePointId))
+		return
+	}
+
+	// Send the message to the charger via WebSocket
+	if err := conn.WriteMessage(websocket.TextMessage, messageBytes); err != nil {
+		s.logger.Error("Failed to send GetMeterValues request to charger",
+			zap.String("charge_point_id", chargePointId),
+			zap.Error(err))
+		return
+	}
+
+	s.logger.Info("GetMeterValues request sent successfully",
+		zap.String("charge_point_id", chargePointId),
+		zap.String("message_id", messageId))
 }

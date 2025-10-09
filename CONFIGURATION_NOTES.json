@@ -1,0 +1,93 @@
+{
+  "server_configuration": {
+    "ip_address": "192.168.137.1",
+    "port": "9999",
+    "full_address": "192.168.137.1:9999",
+    "note": "ALWAYS use 192.168.137.1, NEVER use localhost or 0.0.0.0"
+  },
+  "ocpp_websocket_endpoint": {
+    "url_pattern": "ws://192.168.137.1:9999/ocpp16/{station_id}",
+    "example": "ws://192.168.137.1:9999/ocpp16/2224",
+    "note": "Charging stations connect to this endpoint"
+  },
+  "web_interface": {
+    "url": "http://192.168.137.1:9999",
+    "note": "Access the web UI at this address"
+  },
+  "online_status_logic": {
+    "backend": {
+      "file": "internal/httpapi/stations.go",
+      "logic": "Station is 'online' if last_seen is within 60 seconds, otherwise 'offline'",
+      "implementation": "Calculated in Station struct with status field"
+    },
+    "frontend": {
+      "file": "web/src/pages/Stations.jsx",
+      "logic": "Uses station.status field from API (removed client-side calculation)",
+      "note": "Frontend no longer calculates online status, it trusts the backend"
+    },
+    "last_seen_updates": {
+      "note": "last_seen is updated on ALL charger messages to keep status accurate",
+      "messages_that_update_last_seen": [
+        "Heartbeat - handleHeartbeatRequest",
+        "StatusNotification - handleStatusNotificationRequest",
+        "MeterValues - handleMeterValuesRequest",
+        "BootNotification - handleBootNotificationRequest"
+      ]
+    }
+  },
+  "energy_metering_logic": {
+    "description": "Energy.Active.Import.Register is a CUMULATIVE value from the charger",
+    "rules": [
+      "When station connects and reports Available status on connector 1, send TriggerMessage for MeterValues",
+      "When MeterValues received WITHOUT transaction_id: SET total_energy_wh = meter_reading (cumulative)",
+      "When MeterValues received WITH transaction_id: ADD incremental energy to total_energy_wh",
+      "NEVER use fake/simulated values - always request real meter values from the station",
+      "Re-measure total energy every time a station connects"
+    ],
+    "files_modified": [
+      "internal/ocpp/server.go - handleStatusNotificationRequest triggers meter request",
+      "internal/ocpp/server.go - handleMeterValuesRequest handles both cumulative and incremental",
+      "internal/ocpp/server.go - sendTriggerMessage sends OCPP TriggerMessage to charger"
+    ]
+  },
+  "files_that_must_use_192_168_137_1": [
+    {
+      "file": "internal/config/config.go",
+      "line": 18,
+      "content": "HTTPAddr: getEnv(\"HTTP_ADDR\", \"192.168.137.1:9999\")",
+      "note": "Default HTTP address configuration"
+    },
+    {
+      "file": "cmd/OCPP-Power-Manager/main.go",
+      "lines": [104, 111, 113],
+      "note": "Log messages show correct IP address"
+    }
+  ],
+  "build_and_deploy_process": {
+    "steps": [
+      "1. Make changes to Go backend files",
+      "2. Make changes to React frontend files in web/src/",
+      "3. cd web && npm run build",
+      "4. Copy-Item -Path 'web\\dist\\*' -Destination 'internal\\httpapi\\static\\' -Recurse -Force",
+      "5. go build -mod=vendor ./cmd/OCPP-Power-Manager (or go run)",
+      "6. Run OCPP-Power-Manager.exe"
+    ],
+    "note": "Frontend must be rebuilt and copied after any changes to web/src/"
+  },
+  "websocket_connection_management": {
+    "issue": "Concurrent writes to websocket cause panic",
+    "solution": "Added 100ms delay before sending TriggerMessage in goroutine",
+    "location": "internal/ocpp/server.go line ~768-775",
+    "note": "When sending messages to charger, avoid concurrent writes to same WebSocket"
+  },
+  "key_lessons": {
+    "1": "OCPP chargers don't auto-reconnect immediately when server restarts - may take minutes or require manual reconnection",
+    "2": "Energy.Active.Import.Register is cumulative, not incremental - set it directly, don't add to it",
+    "3": "Online status must be based on recent heartbeats (60s window), not stale last_seen timestamps",
+    "4": "Frontend and backend must stay in sync - frontend should trust backend's status field",
+    "5": "Always bind to 192.168.137.1:9999, never localhost",
+    "6": "Use TriggerMessage (not GetMeterValues) to request meter values from charger",
+    "7": "Request meter values when connector 1 reports Available status"
+  }
+}
+

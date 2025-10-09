@@ -101,16 +101,16 @@ func main() {
 
 	// Start server in a goroutine
 	go func() {
-		logger.Info("🌐 Starting HTTP server", zap.String("addr", cfg.HTTPAddr), zap.String("url", "http://localhost:8080"))
+		logger.Info("🌐 Starting HTTP server", zap.String("addr", cfg.HTTPAddr), zap.String("url", "http://"+cfg.HTTPAddr))
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			logger.Fatal("HTTP server failed", zap.Error(err))
 		}
 	}()
 
 	// Wait for interrupt signal to gracefully shutdown the server
-	logger.Info("✅ OCPP Power Manager is running! Open http://localhost:8080 in your browser")
+	logger.Info("✅ OCPP Power Manager is running! Open http://" + cfg.HTTPAddr + " in your browser")
 	logger.Info("📱 Web interface ready - Manage your EV charging stations")
-	logger.Info("🔌 OCPP server ready - Stations can connect to ws://localhost:8080/ocpp16/{station_id}")
+	logger.Info("🔌 OCPP server ready - Stations can connect to ws://" + cfg.HTTPAddr + "/ocpp16/{station_id}")
 	logger.Info("⏹️ Press Ctrl+C to stop the server")
 
 	quit := make(chan os.Signal, 1)

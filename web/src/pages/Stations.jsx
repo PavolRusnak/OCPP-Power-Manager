@@ -55,12 +55,12 @@ function Stations() {
     fetchStations();
     fetchServerStatus();
     
-    // Set up real-time polling every 5 seconds
+    // Set up real-time polling every 15 seconds
     const interval = setInterval(() => {
       fetchStations();
       fetchServerStatus();
       setLastUpdate(new Date());
-    }, 5000);
+    }, 15000);
     
     return () => clearInterval(interval);
   }, [fetchStations, fetchServerStatus]);
@@ -194,20 +194,9 @@ function Stations() {
     return date.toLocaleDateString();
   };
 
-  const isStationOnline = (timestamp) => {
-    if (!timestamp) return false;
-    const date = new Date(timestamp);
-    const now = new Date();
-    const diffMs = now - date;
-    const diffMins = Math.floor(diffMs / 60000);
-    
-    // Consider station online if last seen within 10 minutes
-    return diffMins <= 10;
-  };
-
   const formatTotalEnergy = (kwh) => {
-    if (kwh === null || kwh === undefined) return '0.000 kWh';
-    return `${kwh.toFixed(3)} kWh`;
+    if (kwh === null || kwh === undefined) return '0 kWh';
+    return `${kwh.toLocaleString('en-US', { maximumFractionDigits: 0 })} kWh`;
   };
 
   return (
@@ -345,7 +334,7 @@ function Stations() {
                     </td>
                     <td className="px-2 py-3 whitespace-nowrap">
                       <div className="text-left flex items-center">
-                        {isStationOnline(station.last_seen) ? (
+                        {station.status === 'online' ? (
                           <div className="flex items-center">
                             <div className="w-2 h-2 bg-green-500 rounded-full mr-2 animate-pulse"></div>
                             <span className="text-green-600 dark:text-green-400 font-medium">Online</span>

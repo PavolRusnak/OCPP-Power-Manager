@@ -27,6 +27,7 @@ type Station struct {
 	TotalEnergyKwh *float64   `json:"total_energy_kwh"`
 	Firmware       *string    `json:"firmware"`
 	LastSeen       *time.Time `json:"last_seen"`
+	Status         string     `json:"status"` // "online" if last_seen within 60s, "offline" otherwise
 }
 
 // CreateStationRequest represents the request to create a station
@@ -111,6 +112,16 @@ func (api *StationsAPI) ListStations(w http.ResponseWriter, r *http.Request) {
 			kwh := float64(*station.TotalEnergyWh) / 1000.0
 			// Round to 3 decimal places
 			station.TotalEnergyKwh = &kwh
+		}
+
+		// Calculate online status: online if last_seen within 5 minutes (300 seconds)
+		// OCPP chargers typically send heartbeats every 1-5 minutes
+		station.Status = "offline"
+		if station.LastSeen != nil {
+			timeSinceLastSeen := time.Since(*station.LastSeen)
+			if timeSinceLastSeen <= 300*time.Second {
+				station.Status = "online"
+			}
 		}
 
 		stations = append(stations, station)
@@ -322,6 +333,16 @@ func (api *StationsAPI) getStationByID(ctx context.Context, id int64) (*Station,
 		kwh := float64(*station.TotalEnergyWh) / 1000.0
 		// Round to 3 decimal places
 		station.TotalEnergyKwh = &kwh
+	}
+
+	// Calculate online status: online if last_seen within 5 minutes (300 seconds)
+	// OCPP chargers typically send heartbeats every 1-5 minutes
+	station.Status = "offline"
+	if station.LastSeen != nil {
+		timeSinceLastSeen := time.Since(*station.LastSeen)
+		if timeSinceLastSeen <= 300*time.Second {
+			station.Status = "online"
+		}
 	}
 
 	return &station, nil
